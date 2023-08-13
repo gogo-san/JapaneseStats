@@ -10,6 +10,9 @@ from dataclasses import dataclass
 sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
 from dacite import from_dict
 
+'''
+跟配置有关的一堆
+'''
 @dataclass
 class SearchFieldConfigModel():
     id: str
@@ -48,6 +51,9 @@ class SearchFieldConfigDeckViewModel:
 class SearchFieldConfigViewModel:
     decks: List[SearchFieldConfigDeckViewModel]
 
+'''
+读取deck的nfield
+'''
 def search_fields_config_view_model(config: SearchFieldConfigModel) -> SearchFieldConfigViewModel:
     decks: List[SearchFieldConfigDeckViewModel] = []
 
@@ -72,6 +78,8 @@ def search_fields_config_view_model(config: SearchFieldConfigModel) -> SearchFie
 
     return SearchFieldConfigViewModel(decks)
 
+
+
 def search_fields_config(view_model: SearchFieldConfigViewModel) -> SearchFieldConfig:
     decks : List[SearchFieldConfigDeck] = []
     for view_model_deck in view_model.decks:
@@ -83,6 +91,10 @@ def search_fields_config(view_model: SearchFieldConfigViewModel) -> SearchFieldC
             decks.append(SearchFieldConfigDeck(view_model_deck.id, models))
     return SearchFieldConfig(decks)
 
+
+'''
+对search field的一堆操作
+'''
 def load_search_field_config() -> SearchFieldConfig:
     config = mw.addonManager.getConfig(__name__) or {}
     if 'search_fields' in config:
@@ -105,12 +117,16 @@ def selected_field_changed(model, view_model, selected_field):
     config = search_fields_config(view_model)
     save_search_field_config(config)
 
+
+'''
+插件的配置界面
+'''
 def show_settings():
     config = load_search_field_config()
     view_model = search_fields_config_view_model(config)
 
     dialog = QDialog()
-    dialog.setWindowTitle("Chinese Stats (Settings):")
+    dialog.setWindowTitle("JLPT Stats (Settings):")
     dialog.setFixedWidth(500)
     dialog.setMinimumHeight(640)
     

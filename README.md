@@ -1,20 +1,27 @@
-# chinese_stats
-Anki Addon for Chinese Stats
+# JapaneseStats
+Anki Addon for JLPT Stats
+based on rjoudrey/chinese_stats https://github.com/rjoudrey/chinese_stats 真的太酷了👍
 
-## Preview
+**ankiweb https://ankiweb.net/shared/info/885817521**
 
-### Stats
-![](stats.png)
+# Usage
+1. ✨Download 
+To download this add-on, please copy and paste the following code into Anki 2.1:  885817521
 
-### Settings
-![](settings.png)
+2. ⚙️Configure it
 
-## Installation
-Download from https://ankiweb.net/shared/info/1959794557
+Tools -> Add-ons -> JLPT-stats -> Config.
+For every japanese deck, please select which note field to search for japanese words.
+Don't worry, same word won't be counted twice, so you can apply this addon for japanese decks as many as possible.
+And in one pharse there are one or more words can be counted, in other words, even filling an article in selected field is okay👌(maybe you don't care about performance).
 
-## Usage
-By default, the addon will not search any decks.  
-To configure which decks and note fields the addon searches, navigate to Tools -> Add-ons -> Chinese Stats -> Config.
+3. 😎Display!
 
-With the addon installed, a menu option will appear under Tools -> Chinese Stats.
-Tapping on this menu option will open an Anki window containing the stats.
+Tools -> JLPT-stats
+
+4. 😆Have fun!
+
+
+# preview
+![preview1](preview1.png)
+![preview2](preview2.png)

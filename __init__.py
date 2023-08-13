@@ -8,28 +8,38 @@ import threading
 import pickle
 import datetime
 from .config import *
-from .lib.gviz import gviz_api
 
 addon_directory = os.path.dirname(__file__)
+sys.path.append(addon_directory)
 
-hsk_data = None
-hsk_tree = None
+from .lib.gviz import gviz_api
+
+
+
+jlpt_data = None
+jlpt_tree = None
 freq_for_word = None
 freq_tree = None
+
+'''
+读取文件
+树是只用来判断是否存在于关键词表中
+源文件是用来读对应词对应的信息的，比如词频和等级。
+'''
 def load_data():
-    global hsk_data
-    global hsk_tree
+    global jlpt_data
+    global jlpt_tree
     global freq_tree
     global freq_for_word
 
-    hsk_file_path = os.path.join(addon_directory, 'hsk.json')
-    hsk_file = open(hsk_file_path, encoding='utf_8_sig')
-    hsk_data = json.load(hsk_file)
+    jlpt_file_path = os.path.join(addon_directory, 'jlpt.json')
+    jlpt_file = open(jlpt_file_path, encoding='utf_8_sig')
+    jlpt_data = json.load(jlpt_file)
 
-    hsk_tree_file_path = os.path.join(addon_directory, 'hsk_tree.pickle')
-    hsk_tree_file = open(hsk_tree_file_path, 'rb')
-    hsk_tree = pickle.load(hsk_tree_file)
-    hsk_tree_file.close()
+    jlpt_tree_file_path = os.path.join(addon_directory, 'jlpt_tree.pickle')
+    jlpt_tree_file = open(jlpt_tree_file_path, 'rb')
+    jlpt_tree = pickle.load(jlpt_tree_file)
+    jlpt_tree_file.close()
 
     freq_file_path = os.path.join(addon_directory, 'freq.txt')
     freq_file = open(freq_file_path, encoding='utf_8_sig')
@@ -41,6 +51,10 @@ def load_data():
     freq_tree = pickle.load(freq_tree_file)
     freq_tree_file.close()
 
+'''
+根据频率给星级
+这个频率是行数
+'''
 def freq_num_stars(freq: int) -> int:
     if freq <= 1500:
         return 5
@@ -55,13 +69,34 @@ def freq_num_stars(freq: int) -> int:
     else:
         return 0
 
+'''
+各级的词汇量数组 
+python还有这种写法的吗好方便
+虽然但是这个根本没有用到吧！
+'''
 def num_words_for_stars(num_stars: int) -> int:
     return [ -1, 30000, 15000, 10000, 3500, 1500 ][num_stars]
 
-def num_words_in_hsk_level(hsk_level: int) -> int:
-    return [ 150, 150, 300, 600, 1300, 2500 ][hsk_level - 1]
+def num_words_in_jlpt_level(jlpt_level: int) -> int:
+    return [ 150, 150, 300, 600, 1300, 2500 ][jlpt_level - 1]
 
-def chinese_stats() -> None:
+
+'''
+提取数据进行统计
+具体怎么搜索的
+The search_all method returns a generator for all keywords found, or None if there is none.
+
+results = kwtree.search_all('malheur on mallorca bellacrosse')
+for result in results:
+    print(result)
+Prints :
+
+('mallorca', 11)
+('orca', 15)
+('mallorca bella', 11)
+('lacrosse', 23)
+'''
+def japanese_stats() -> None:
     # Extract the sentences from the notes
     config = load_search_field_config()
     sentence_note_ids = list()
@@ -77,6 +112,8 @@ def chinese_stats() -> None:
         note = mw.col.getNote(note_id)
         if search_field not in note:
             continue
+
+        # 提取数据库里search_field的数据，id,内容,学习时间
         sentence_note_ids.append(note_id)
         sentence_for_note_id[note_id] = note[search_field]
         note_info[note_id] = first_study_date
@@ -84,22 +121,24 @@ def chinese_stats() -> None:
     # Wait on data loading to finish
     load_data_thread.join()
 
-    # Search the sentences for HSK words
-    hsk_found_words = set()
-    hsk_results = dict()
-    for hsk_level in range(1, 7):
-        hsk_results.setdefault(str(hsk_level), [])
+    # 搜索等级
+    jlpt_found_words = set()
+    jlpt_results = dict()
+    for jlpt_level in range(1, 6):
+        jlpt_results.setdefault(str(jlpt_level), [])
+        #生成 1：[],2:[],...
+
 
     for note_id in sentence_note_ids:
         sentence = sentence_for_note_id[note_id]
-        for word, _ in hsk_tree.search_all(sentence):
-            if word in hsk_found_words:
+        for word, _ in jlpt_tree.search_all(sentence):
+            if word in jlpt_found_words: #去重复:如果有的就不再统计
                 continue
-            hsk_level = hsk_data[word]
-            hsk_results[str(hsk_level)].append(note_id)
-            hsk_found_words.add(word)
+            jlpt_level = jlpt_data[word]
+            jlpt_results[str(jlpt_level)].append(note_id)
+            jlpt_found_words.add(word)
 
-    # Search the sentences for words in the frequency list
+    # 搜索频率 
     freq_found_words = set()
     freq_results = dict()
     for num_stars in reversed(range(0, 6)):
@@ -108,24 +147,31 @@ def chinese_stats() -> None:
     for note_id in sentence_note_ids:
         sentence = sentence_for_note_id[note_id]
         for word, _ in freq_tree.search_all(sentence):
-            if word in freq_found_words:
+            if word in freq_found_words: #去重复:如果有的就不再统计
                 continue
-            freq = freq_for_word[word]
+            freq = freq_for_word[word] #行数
             num_stars = freq_num_stars(freq)
             freq_results[str(num_stars)].append(note_id)
             freq_found_words.add(word)
 
-    return (note_info, hsk_results, freq_results)
+    return (note_info, jlpt_results, freq_results)
 
+'''
+time转字符串
+'''
 def to_day(time: datetime):
     return datetime.datetime.strftime(time, '%Y-%m-%d')
 
 def to_datetime(time_str: str):
     return datetime.datetime.strptime(time_str, '%Y-%m-%d')
 
+
+'''
+对统计得到的结果进行日期归类
+'''
 def results_by_day(note_info, results):
     results_by_date = dict()
-    for key, note_ids in results.items():
+    for key, note_ids in results.items(): #1:[],2:[]
         for note_id in note_ids:
             created_epoch = int(note_info[note_id]) / 1000.0
             time_note_created = datetime.datetime.fromtimestamp(created_epoch)
@@ -138,19 +184,26 @@ def results_by_day(note_info, results):
                 results_by_date[date_note_created_str][key] = 0
 
             results_by_date[date_note_created_str][key] += 1
-    return results_by_date
-    
+    return results_by_date   # result_by_date[date][level] = count
+
+
+'''
+对前面几天的值进行累加 得到每天的值
+'''
 def cumulative_results_by_day(note_info, results):
     results_by_date = results_by_day(note_info, results)
     cumulative_results = dict()
-    running_total = dict.fromkeys(results.keys(), 0)
+    running_total = dict.fromkeys(results.keys(), 0)  # 用来累加的
     for date_str in sorted(results_by_date):
         results = results_by_date[date_str]
-        for key, num_words_created in results.items():
+        for key, num_words_created in results.items(): #对每个level累加
             running_total[key] += num_words_created
-        cumulative_results[date_str] = dict(running_total)
+        cumulative_results[date_str] = dict(running_total) # 结果
     return cumulative_results
 
+'''
+把数据转换到图表格式
+'''
 def chart_json(note_info, results, column_name_func):
     cumulative_daily_results = cumulative_results_by_day(note_info, results)
 
@@ -181,6 +234,10 @@ def chart_json(note_info, results, column_name_func):
         order_by="date"
     )
 
+
+'''
+数据页的视图
+'''
 class MyWebView(AnkiWebView):
     def __init__(self):
         AnkiWebView.__init__(self, None)
@@ -191,15 +248,15 @@ class MyWebView(AnkiWebView):
             google.charts.load('current', {packages:['corechart']});
             google.charts.setOnLoadCallback(drawCharts);
 
-            function drawHskChart() {
+            function drawJlptChart() {
                 var options = {
                     isStacked: true,
                     focusTarget: 'category',
-                    title: 'Known Words by HSK Level',
+                    title: 'Known Words by Japanese Level',
                     hAxis: {title: 'Date',  titleTextStyle: {color: '#333'}},
                     vAxis: {minValue: 0}
                 };
-                var chart = new google.visualization.AreaChart(document.getElementById('hsk_chart'));
+                var chart = new google.visualization.AreaChart(document.getElementById('jlpt_chart'));
                 var data = new google.visualization.DataTable(%s, 0.6);
                 chart.draw(data, options);
             }
@@ -218,7 +275,7 @@ class MyWebView(AnkiWebView):
             }
 
             function drawCharts() {
-                drawHskChart();
+                drawJlptChart();
                 drawFreqChart();
             }
 
@@ -227,19 +284,19 @@ class MyWebView(AnkiWebView):
             });
         </script>
         <body>
-            <H1>Chinese Stats</H1>
-            <div id="hsk_chart" style="height: 500px; width: 100%%"></div>
+            <H1>JLPT Stats</H1>
+            <div id="jlpt_chart" style="height: 500px; width: 100%%"></div>
             <div id="freq_chart" style="height: 500px; width: 100%%"></div>
         </body>
         </html>
         """
 
         # Create the chart data
-        note_info, hsk_results, freq_results = chinese_stats()
+        note_info, jlpt_results, freq_results = japanese_stats()
 
-        def hsk_column_name(column_id):
-            return "HSK {}".format(column_id)
-        hsk_json = chart_json(note_info, hsk_results, hsk_column_name)
+        def jlpt_column_name(column_id):
+            return "N {}".format(column_id)
+        jlpt_json = chart_json(note_info, jlpt_results, jlpt_column_name)
 
         def freq_column_name(column_id):
             num_stars = int(column_id)
@@ -248,16 +305,20 @@ class MyWebView(AnkiWebView):
         freq_json = chart_json(note_info, freq_results, freq_column_name)
 
         # Inject it into the template
-        html = page_template % (hsk_json, freq_json)
+        html = page_template % (jlpt_json, freq_json)
         self.stdHtml(html)
 
+
+'''
+好像是事件
+'''
 def show_webview():
     webview = MyWebView()
     webview.show()
     webview.setFocus()
     webview.activateWindow()
 
-stats_action = QAction("Chinese Stats", mw)
+stats_action = QAction("JLPT Stats", mw)
 qconnect(stats_action.triggered, show_webview)
 mw.form.menuTools.addAction(stats_action)
 
